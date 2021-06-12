@@ -4,8 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+pillow = "*"
 
 [dev-packages]
+flake8 = "*"
 
 [requires]
 python_version = "3.7"
