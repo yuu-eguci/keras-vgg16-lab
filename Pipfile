@@ -5,8 +5,8 @@ name = "pypi"
 
 [packages]
 pillow = "*"
-keras = "*"
 tensorflow = "*"
+keras = "*"
 
 [dev-packages]
 flake8 = "*"
