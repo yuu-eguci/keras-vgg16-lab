@@ -6,7 +6,7 @@ keras-vgg16-lab
 ## Installation
 
 I don't know why but Keras and Tensorflow occur pipenv "Locking failed!" error.  
-So I gave up pipenv to create corrent Pipfile.lock.
+So I gave up pipenv to create correct Pipfile.lock.
 
 ```bash
 pipenv install --skip-lock
