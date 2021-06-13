@@ -60,6 +60,7 @@ def main(input_filename: str):
     # NOTE: decode_predictions の返り値は
     #       [[('n02106662', 'German_shepherd', 0.9971668),...)]]
     #       みたいな list です。このスクリプトだと list の要素はひとつなんでどうして list なのかよくわかんないです。
+    #       が、複数の画像を予測に回したときその list 要素が増えるみたい。
     #       とまあそういうわけで [0] で結果を取得しています。
     # NOTE: <class 'list'>
     top_5_predictions = decode_predictions(predictions, top=5)[0]
