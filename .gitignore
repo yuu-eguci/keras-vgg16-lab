@@ -140,3 +140,4 @@ cython_debug/
 .vscode
 my-images/*
 .DS_Store
+*.hdf5
