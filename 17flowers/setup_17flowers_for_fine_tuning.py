@@ -27,7 +27,6 @@ IN_DIR = 'jpg'
 TRAIN_DIR = 'train_images'
 # 80枚の中から10枚を、予測テスト用画像として TEST_DIR に格納します。
 TEST_DIR = 'test_images'
-# 画像分類のため
 
 
 def main():
