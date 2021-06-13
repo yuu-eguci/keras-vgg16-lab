@@ -8,9 +8,6 @@ vgg16……
     imported but unused(F401)とかあるから整理も兼ねて。
 """
 
-import os
-import sys
-
 # NOTE: ここ(keras.models.Model)で3secくらいかかるみたい。
 # NOTE: 「Model って VGG じゃないの?」って思っていたが、こっちの Model は interface(abstract)だ。
 from keras.models import Model
@@ -18,6 +15,11 @@ from keras.layers import Dense, GlobalAveragePooling2D, Input
 from keras.applications.vgg16 import VGG16
 from keras.preprocessing.image import ImageDataGenerator
 from keras.optimizers import SGD
+
+# 学習用画像が格納されているフォルダです。
+TRAIN_DIR = '17flowers/train_images'
+# テスト用画像が格納されているフォルダです。
+TEST_DIR = '17flowers/test_images'
 
 
 def main():
@@ -69,6 +71,87 @@ def main():
     #       dense_1 (Dense)              (None, 17)                17425
     #       たぶん17ってのが Dense(17... で追加した層だろう。
     model.summary()
+
+    # VGG16 の全層の重みを固定しています。
+    # VGG16 側の層の重みは学習時に変更されません。
+    # base_model は最初に用意した13層のこと。
+    # これはもう学習終わってんのだから(imagenet で)、 train する必要なしです。
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    # モデルを作っただけだと線形の結果しか出ません。
+    # y = a * b * c * x みたいなものだからです。
+    # 係数を自分で変更させるように……
+    model.compile(
+        optimizer=SGD(
+            # NOTE: サンプルコードでは lr になっていたが、
+            #       UserWarning: The `lr` argument is deprecated, use `learning_rate` instead.
+            #       が出るので learning_rate へ変更しました。
+            learning_rate=0.0001,
+            momentum=0.9,
+        ),
+        # 右辺と左辺の差を小さくするためのもの。微分です。
+        loss='categorical_crossentropy',
+        metrics=['accuracy'],
+    )
+
+    # Training に使う画像を生成する ImageDataGenerator を作ります。
+    # NOTE: ImageDataGenerator は与えた画像をいじり、 training に使う画像パターンを増やします。
+    #       https://keras.io/ja/preprocessing/image/
+    # NOTE: <class 'keras.preprocessing.image.ImageDataGenerator'>
+    image_data_generator_to_train = ImageDataGenerator(
+        rescale=1.0 / 255,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        rotation_range=10,
+    )
+
+    # 予測? 類推? 推測?(用語がわからん)テストに使う画像を生成する ImageDataGenerator を作ります。
+    # NOTE: どうして小さくしているのかというと、モデルは小数点で学習するからです。
+    #       どういうこと?
+    image_data_generator_to_test = ImageDataGenerator(
+        rescale=1.0 / 255,
+    )
+
+    # ImageDataGenerator へ画像を与えます。
+    # NOTE: <class 'keras.preprocessing.image.DirectoryIterator'>
+    directory_iterator_for_training = image_data_generator_to_train.flow_from_directory(
+        TRAIN_DIR,
+        target_size=(224, 224),
+        batch_size=16,
+        class_mode='categorical',
+        shuffle=True,
+    )
+
+    directory_iterator_for_test = image_data_generator_to_test.flow_from_directory(
+        TEST_DIR,
+        target_size=(224, 224),
+        batch_size=16,
+        class_mode='categorical',
+        shuffle=True,
+    )
+
+    # ここで学習を行います。なので時間かかります。
+    # fit は学習のメソッドです。
+    # NOTE: サンプルコードでは Model.fit_generator になっていたが、
+    #       UserWarning: `Model.fit_generator` is deprecated and
+    #                    will be removed in a future version.
+    #                    Please use `Model.fit`, which supports generators.
+    #       が出るため model.fit に変更しました。
+    # NOTE: <class 'keras.callbacks.History'>
+    history = model.fit(
+        directory_iterator_for_training,
+        # NOTE: 1190 はトレーニング用の枚数です。 70*17=1190
+        steps_per_epoch=1190 // 16,
+        epochs=50,
+        verbose=1,
+        validation_data=directory_iterator_for_test,
+        # NOTE: 170 はテスト用の枚数です。 10*17=170
+        validation_steps=170 // 16,
+    )
+
+    model.save('17flowers.hdf5')
 
 
 if __name__ == '__main__':
