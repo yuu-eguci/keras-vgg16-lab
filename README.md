@@ -13,6 +13,37 @@ pipenv install --skip-lock
 pipenv run pip install -r requirements.txt
 ```
 
+### Installation in Japanese
+
+まず何らかの方法で pipenv を手に入れてください。
+
+- [https://pipenv-ja.readthedocs.io/ja/translate-ja/install.html#installing-pipenv](https://pipenv-ja.readthedocs.io/ja/translate-ja/install.html#installing-pipenv)
+
+「手に入れられたのか」わからない? こちら↓のコマンドを Terminal で打って、バージョンが出れば成功です。
+
+```bash
+pipenv --version
+# -> pipenv, version 2020.11.15 みたいに出れば OK.
+```
+
+pipenv を手に入れてから、こう↓です。
+
+```bash
+pipenv install --skip-lock
+pipenv run pip install -r requirements.txt
+
+# かんたんに prediction を試す。
+pipenv run python test-images/shepherd.jpg
+
+# すでに @yuu-eguci から hdf5 を受け取っている場合に、すぐに花の prediction を試す場合。
+pipenv run python load_17flowers.py
+
+# 自分で fine tuning を試したい場合。
+cd 17flowers/
+# これで 17flowers に入ってから、 setup_17flowers_for_fine_tuning.py の指示に従う。
+# あ、やべ間に合わない。あとは会議にて。
+```
+
 ## To explain Keras, Vgg16 and Fine tuning with my own mouse
 
 ### Keras
