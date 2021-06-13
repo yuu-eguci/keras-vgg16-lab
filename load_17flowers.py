@@ -57,8 +57,8 @@ def main(input_filename: str):
     # 今回は学習を行う必要がありません。 Weight file はすでにあるので。
     model.load_weights('17flowers.hdf5')
 
-    # NOTE: hdf5 を作る前に compile しているのになんでやり直さないといけないの?
-    #       と思ったのでやらないで試しました。
+    # NOTE: predict 前に model.compile する必要はありますか?
+    #       試しました。
     #       やって sunflower.jpg 試した場合↓
     #           ('Cowslip', 0.14450616)
     #           ('Sunflower', 0.08813832)
@@ -67,18 +67,6 @@ def main(input_filename: str):
     #           ('Cowslip', 0.14450616)
     #           ('Sunflower', 0.08813832)
     #           ('Tigerlily', 0.07421722)
-    # model.compile(
-    #     optimizer=SGD(
-    #         # NOTE: サンプルコードでは lr になっていたが、
-    #         #       UserWarning: The `lr` argument is deprecated, use `learning_rate` instead.
-    #         #       が出るので learning_rate へ変更しました。
-    #         learning_rate=0.0001,
-    #         momentum=0.9,
-    #     ),
-    #     # 右辺と左辺の差を小さくするためのもの。微分です。
-    #     loss='categorical_crossentropy',
-    #     metrics=['accuracy'],
-    # )
 
     # 予測を行います。
     # NOTE: test_vgg16 では
