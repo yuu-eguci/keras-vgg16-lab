@@ -33,10 +33,10 @@ pipenv install --skip-lock
 pipenv run pip install -r requirements.txt
 
 # かんたんに prediction を試す。
-pipenv run python test-images/shepherd.jpg
+pipenv run python test_vgg16.py test-images/shepherd.jpg
 
 # すでに @yuu-eguci から hdf5 を受け取っている場合に、すぐに花の prediction を試す場合。
-pipenv run python load_17flowers.py
+pipenv run python load_17flowers.py sunflower.jpg
 
 # 自分で fine tuning を試したい場合。
 cd 17flowers/
