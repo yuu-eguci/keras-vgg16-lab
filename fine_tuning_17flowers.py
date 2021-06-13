@@ -1,11 +1,13 @@
-"""
-vgg16……
-    「ImageNet」と呼ばれる大規模画像データセットで学習された，16層からなるCNNモデル……
-に、 17flowers のデータを加えて、 seventeen flowers の分類を可能する……
-    それが fine tuning……
-よ。
-参考: https://spjai.com/keras-fine-tuning/
-    imported but unused(F401)とかあるから整理も兼ねて。
+"""fine_tuning_17flowers
+
+VGG16 で 17flowers dataset で fine tuning することを目的とするスクリプトです。
+一応 main 関数の最後で model.save('17flowers.hdf5') するところまでやっていますが、
+それがゴールになっているのか未検証です……。
+
+1. 17flowers/setup_17flowers_for_fine_tuning.py によって 17flowers をセットアップする。
+2. python fine_tuning_17flowers.py
+   WARN: すごく時間がかかる可能性があります。ぼくのローカルで実行したときは2時間半かかりました。
+3. 結果として生成された hdf5 を load_17flowers.py で利用する。
 """
 
 # NOTE: ここ(keras.models.Model)で3secくらいかかるみたい。
@@ -42,14 +44,14 @@ def main():
     base_model = VGG16(weights='imagenet', include_top=False, input_tensor=input_tensor)
 
     # 新たな層を追加しています。
-    # NOTE: さっき VGG13 だったのが VGG14 になるってこと。
-    #       (これは理解しやすいからそう書いているだけなので他所で言わないように。)
     # この output っていうのが現在の最後の13層目のことです。
     # NOTE: <class 'keras.engine.keras_tensor.KerasTensor'>
     x = base_model.output
 
     # GlobalAveragePooling2D という層を足しています。(14層目)
-    # NOTE: Dense は時間がかかるが GlobalAveragePooling は高速(GAP で伝わる)だという話です。
+    # NOTE: さっき VGG13 だったのが VGG14 になるってこと。
+    #       (これは理解しやすいからそう書いているだけなので他所で言わないように。)
+    # NOTE: Dense は時間がかかるが GlobalAveragePooling は高速だという話です。
     x = GlobalAveragePooling2D()(x)
 
     # Dense という層を足しています。(15層目)
@@ -150,7 +152,10 @@ def main():
         # NOTE: 170 はテスト用の枚数です。 10*17=170
         validation_steps=170 // 16,
     )
+    print(type(history))
 
+    # 保存したものを予測にしか使わないなら include_optimizer=False を設定しておくと、サイズが半分以下になるそうだ。
+    # NOTE: 保存したファイルを利用するのは別ファイルです。
     model.save('17flowers.hdf5')
 
 
