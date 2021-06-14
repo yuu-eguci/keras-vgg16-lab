@@ -68,4 +68,4 @@ Therefore, when I want to play with machine learning, I should choose model and 
 
 1. What to do?
 2. Which model realizes it? (Detecting, classifying, or ...)
-3. Which format of dataset does the chosen mode requires?
+3. Which format of dataset does the chosen model requires?
