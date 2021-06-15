@@ -10,8 +10,8 @@ keras-vgg16-lab repository を見たときは一番最初に実行するスク�
 
 import sys
 
-from keras.applications.vgg16 import VGG16, preprocess_input, decode_predictions
-from keras.preprocessing import image
+from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing import image
 import numpy
 
 
