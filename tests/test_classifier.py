@@ -82,6 +82,7 @@ def test_model_without_metadata_is_refused(trained, tmp_path):
         {'format_version': 2},
         {'class_names': ['a_class', 'b_class']},
         {'class_names': ['a_class', 'a_class', 'c_class']},
+        {'class_names': 'abc'},
         {'image_size': [224, 224]},
     ],
 )

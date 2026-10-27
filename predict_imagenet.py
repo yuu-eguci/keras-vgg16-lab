@@ -19,14 +19,14 @@ from keras.utils import img_to_array, load_img
 def main(input_filename: str):
 
     # VGG16 をロードします。
-    # 重みファイル(学習済みデータのこと)には imagenet を指定します。
+    # 重みファイル (学習済みデータ) には imagenet を指定します。
     # NOTE: 今回は作成済みの重みファイルを使います。
     #       そのため、テストのためにわざわざ学習に時間をとることがありません。
     # NOTE: <class 'keras.src.models.functional.Functional'>
     vgg16 = VGG16(weights='imagenet')
 
     # VGG16 の内容……サマリを見るにはこうします。
-    # 16の由来である、16層の畳み込みニューラルネットワークのサマリを閲覧できます。
+    # VGG16 は畳み込み13層と全結合3層の計16層です。サマリで構成を確認できます。
     # NOTE: はい勿論ここはよくわかっていません。
     vgg16.summary()
 
@@ -42,7 +42,7 @@ def main(input_filename: str):
 
     # 3次元テンソル(rows, cols, channels)を4次元テンソル(samples, rows, cols, channels)に変換する、
     # という行為を行っています。
-    # 入力画像が1枚なので、 smaples=1 でいいそうです。
+    # 入力画像が1枚なので、 samples=1 でいいそうです。
     # NOTE: 意味不明。だけど、 row, col, channel は OpenCV で見た覚えがあります。
     #       まあ画像の形式を変換しているんでしょう。(小泉文法)
     # NOTE: <class 'numpy.ndarray'>

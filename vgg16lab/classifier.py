@@ -181,7 +181,12 @@ def _parse_metadata(raw: dict) -> Metadata:
     if raw['preprocessing'] != PREPROCESSING or raw['interpolation'] != INTERPOLATION or raw['color_mode'] != 'rgb':
         raise ValueError('前処理がいまのコードと違います。')
     class_names = raw['class_names']
-    if not class_names or len(set(class_names)) != len(class_names) or not all(isinstance(n, str) for n in class_names):
+    if (
+        not isinstance(class_names, list)
+        or not class_names
+        or not all(isinstance(n, str) for n in class_names)
+        or len(set(class_names)) != len(class_names)
+    ):
         raise ValueError('class_names は重複のない文字列のリストにしてください。')
     height, width = raw['image_size']
     if height != width or not isinstance(height, int):
