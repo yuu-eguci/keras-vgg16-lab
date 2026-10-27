@@ -1,163 +1,56 @@
 """fine_tuning_17flowers
 
 VGG16 で 17flowers dataset で fine tuning することを目的とするスクリプトです。
-一応 main 関数の最後で model.save('17flowers.hdf5') するところまでやっていますが、
-それがゴールになっているのか未検証です……。
+VGG16 の畳み込み層 (ImageNet で学習済み) は固定して、その上に足した層だけを学習します。
 
 1. 17flowers/setup_17flowers_for_fine_tuning.py によって 17flowers をセットアップする。
-2. python fine_tuning_17flowers.py
-   WARN: すごく時間がかかる可能性があります。ぼくのローカルで実行したときは2時間半かかりました。
-3. 結果として生成された hdf5 を load_17flowers.py で利用する。
+2. uv run python fine_tuning_17flowers.py
+   WARN: CPU だと 1 epoch に数十秒から数分かかります。まずは --epochs 1 や 3 で試すのがおすすめです。
+3. 結果として生成された 17flowers.keras と 17flowers.metadata.json を load_17flowers.py で利用する。
+
+中身は vgg16lab/classifier.py にあります。
 """
 
-# NOTE: ここ(keras.models.Model)で3secくらいかかるみたい。
-# NOTE: 「Model って VGG じゃないの?」って思っていたが、こっちの Model は interface(abstract)だ。
-from keras.models import Model
-from keras.layers import Dense, GlobalAveragePooling2D, Input
-from keras.applications.vgg16 import VGG16
-from keras.preprocessing.image import ImageDataGenerator
-from keras.optimizers import SGD
-
-# 学習用画像が格納されているフォルダです。
-TRAIN_DIR = '17flowers/train_images'
-# テスト用画像が格納されているフォルダです。
-TEST_DIR = '17flowers/test_images'
+import argparse
+import sys
+from pathlib import Path
 
 
-def main():
-
-    # VGG16 のデフォルトである 224x224 でインプットを定義します。
-    # NOTE: <class 'keras.engine.keras_tensor.KerasTensor'>
-    # NOTE: Tensor は
-    #       > 線形的な量または線形的な幾何概念を一般化したもので、基底を選べば、多次元の配列として表現できるようなものである。
-    #       > (Wikipedia より)
-    #       です。(?)
-    input_tensor = Input(shape=(224, 224, 3))
-
-    # VGG16 をロードします。
-    # が、今回はフル結合3層をつけずにロードしています。
-    # NOTE: include_top=False がフル結合3層をつけないという指定です。
-    #       VGG16 は畳み込み13層とフル結合3層の計16層から成ります。
-    #       なので、いうなれば VGG13 になってるってこと。
-    #       (これは理解しやすいからそう書いているだけで誤解なきよう。)
-    # NOTE: <class 'keras.engine.functional.Functional'>
-    base_model = VGG16(weights='imagenet', include_top=False, input_tensor=input_tensor)
-
-    # 新たな層を追加しています。
-    # この output っていうのが現在の最後の13層目のことです。
-    # NOTE: <class 'keras.engine.keras_tensor.KerasTensor'>
-    x = base_model.output
-
-    # GlobalAveragePooling2D という層を足しています。(14層目)
-    # NOTE: さっき VGG13 だったのが VGG14 になるってこと。
-    #       (これは理解しやすいからそう書いているだけなので他所で言わないように。)
-    # NOTE: Dense は時間がかかるが GlobalAveragePooling は高速だという話です。
-    x = GlobalAveragePooling2D()(x)
-
-    # Dense という層を足しています。(15層目)
-    x = Dense(1024, activation='relu')(x)
-
-    # ここが自分の追加したい層。(16層目)
-    y = Dense(17, activation='softmax')(x)
-
-    # 完成したこれが層のかたまり。
-    # NOTE: x とか y とかって変数名を使っているのは、このモデルの構築手順は数式で表せる(らしい)からです。
-    #       こんな感じに。こういうのって数式って言うの? 方程式じゃなくて?
-    #       y = Dense(Dense(GlobalAveragePooling2D(x)))
-    # NOTE: <class 'keras.engine.functional.Functional'>
-    model = Model(inputs=base_model.input, outputs=y)
-
-    # 構築した改造 VGG16 を閲覧します。
-    # VGG1 6の構造に加え、最後に層が追加されている事がわかります。
-    # NOTE: こういうのが増えてる
-    #       dense_1 (Dense)              (None, 17)                17425
-    #       たぶん17ってのが Dense(17... で追加した層だろう。
-    model.summary()
-
-    # VGG16 の全層の重みを固定しています。
-    # VGG16 側の層の重みは学習時に変更されません。
-    # base_model は最初に用意した13層のこと。
-    # これはもう学習終わってんのだから(imagenet で)、 train する必要なしです。
-    for layer in base_model.layers:
-        layer.trainable = False
-
-    # モデルを作っただけだと線形の結果しか出ません。
-    # y = a * b * c * x みたいなものだからです。
-    # 係数を自分で変更させるように……
-    model.compile(
-        optimizer=SGD(
-            # NOTE: サンプルコードでは lr になっていたが、
-            #       UserWarning: The `lr` argument is deprecated, use `learning_rate` instead.
-            #       が出るので learning_rate へ変更しました。
-            learning_rate=0.0001,
-            momentum=0.9,
-        ),
-        # 右辺と左辺の差を小さくするためのもの。微分です。
-        loss='categorical_crossentropy',
-        metrics=['accuracy'],
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description='17flowers で VGG16 に足した層を学習します。')
+    parser.add_argument('--train-dir', type=Path, default=Path('17flowers/train_images'), help='学習用画像のフォルダ')
+    parser.add_argument('--val-dir', type=Path, default=Path('17flowers/test_images'), help='検証用画像のフォルダ')
+    parser.add_argument('--output', type=Path, default=Path('17flowers.keras'), help='保存するモデル (.keras)')
+    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--image-size', type=int, default=224, help='入力画像の一辺 (32 以上)')
+    parser.add_argument(
+        '--weights',
+        choices=['imagenet', 'none'],
+        default='imagenet',
+        help='VGG16 の初期の重み。none はランダムで、動作確認用です',
     )
+    parser.add_argument('--seed', type=int, default=0)
+    args = parser.parse_args(argv)
+    if args.output.suffix != '.keras':
+        parser.error('--output は .keras で終わる名前にしてください。')
 
-    # Training に使う画像を生成する ImageDataGenerator を作ります。
-    # NOTE: ImageDataGenerator は与えた画像をいじり、 training に使う画像パターンを増やします。
-    #       https://keras.io/ja/preprocessing/image/
-    # NOTE: <class 'keras.preprocessing.image.ImageDataGenerator'>
-    image_data_generator_to_train = ImageDataGenerator(
-        rescale=1.0 / 255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
-        rotation_range=10,
+    # TensorFlow の import は重いので、引数を確かめてからにします。
+    from vgg16lab.classifier import train
+
+    train(
+        args.train_dir,
+        args.val_dir,
+        args.output,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        image_size=args.image_size,
+        weights=None if args.weights == 'none' else args.weights,
+        seed=args.seed,
     )
-
-    # 予測? 類推? 推測?(用語がわからん)テストに使う画像を生成する ImageDataGenerator を作ります。
-    # NOTE: どうして小さくしているのかというと、モデルは小数点で学習するからです。
-    #       どういうこと?
-    image_data_generator_to_test = ImageDataGenerator(
-        rescale=1.0 / 255,
-    )
-
-    # ImageDataGenerator へ画像を与えます。
-    # NOTE: <class 'keras.preprocessing.image.DirectoryIterator'>
-    directory_iterator_for_training = image_data_generator_to_train.flow_from_directory(
-        TRAIN_DIR,
-        target_size=(224, 224),
-        batch_size=16,
-        class_mode='categorical',
-        shuffle=True,
-    )
-
-    directory_iterator_for_test = image_data_generator_to_test.flow_from_directory(
-        TEST_DIR,
-        target_size=(224, 224),
-        batch_size=16,
-        class_mode='categorical',
-        shuffle=True,
-    )
-
-    # ここで学習を行います。なので時間かかります。
-    # fit は学習のメソッドです。
-    # NOTE: サンプルコードでは Model.fit_generator になっていたが、
-    #       UserWarning: `Model.fit_generator` is deprecated and
-    #                    will be removed in a future version.
-    #                    Please use `Model.fit`, which supports generators.
-    #       が出るため model.fit に変更しました。
-    # NOTE: <class 'keras.callbacks.History'>
-    history = model.fit(
-        directory_iterator_for_training,
-        # NOTE: 1190 はトレーニング用の枚数です。 70*17=1190
-        steps_per_epoch=1190 // 16,
-        epochs=50,
-        verbose=1,
-        validation_data=directory_iterator_for_test,
-        # NOTE: 170 はテスト用の枚数です。 10*17=170
-        validation_steps=170 // 16,
-    )
-    print(type(history))
-
-    # 保存したものを予測にしか使わないなら include_optimizer=False を設定しておくと、サイズが半分以下になるそうだ。
-    # NOTE: 保存したファイルを利用するのは別ファイルです。
-    model.save('17flowers.hdf5')
+    print(f'保存しました: {args.output}')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

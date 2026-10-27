@@ -1,0 +1,43 @@
+[project]
+name = "keras-vgg16-lab"
+version = "0.1.0"
+description = "Keras の VGG16 と 17flowers で fine tuning を試す実験リポジトリ"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "keras>=3.15.1",
+    "numpy>=2.3",
+    "pillow>=12.1.1",
+    "tensorflow>=2.21,<2.22",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "ruff>=0.17",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "vgg16lab"
+module-root = ""
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+# 2021 年の Colaboratory 用ノートブックはそのまま残します。
+extend-exclude = ["setup_flower_stuff_lab.ipynb"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"

@@ -1,47 +1,48 @@
-"""test_vgg16
+"""predict_imagenet
 
 keras の VGG16 モデルで画像予測(類推? 推論? 用語がわからん)のテストを行うスクリプトです。
 keras-vgg16-lab repository を見たときは一番最初に実行するスクリプトです。
 
 1. 推論したい画像を自分でてきとうに用意してください。
-2. python test_vgg16.py [その画像のパス]
+2. uv run python predict_imagenet.py [その画像のパス]
+   初回は ImageNet 学習済みの重み (約 553 MB) をダウンロードします。
 3. コンソールを見たらなんとなくわかるでしょう。
 """
 
 import sys
 
-from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input, decode_predictions
-from tensorflow.keras.preprocessing import image
 import numpy
+from keras.applications.vgg16 import VGG16, decode_predictions, preprocess_input
+from keras.utils import img_to_array, load_img
 
 
 def main(input_filename: str):
 
     # VGG16 をロードします。
-    # 重みファイル(学習済みデータのこと)には imagenet を指定します。
+    # 重みファイル (学習済みデータ) には imagenet を指定します。
     # NOTE: 今回は作成済みの重みファイルを使います。
     #       そのため、テストのためにわざわざ学習に時間をとることがありません。
-    # NOTE: <class 'keras.engine.functional.Functional'>
+    # NOTE: <class 'keras.src.models.functional.Functional'>
     vgg16 = VGG16(weights='imagenet')
 
     # VGG16 の内容……サマリを見るにはこうします。
-    # 16の由来である、16層の畳み込みニューラルネットワークのサマリを閲覧できます。
+    # VGG16 は畳み込み13層と全結合3層の計16層です。サマリで構成を確認できます。
     # NOTE: はい勿論ここはよくわかっていません。
     vgg16.summary()
 
-    # test_vgg16.py の引数で指定した画像を読み込みます。
+    # predict_imagenet.py の引数で指定した画像を読み込みます。
     # ここでは VGG16 のデフォルトである 224x224 にリサイズしています。
-    # NOTE: 画像の入力は、 keras.preprocessing.image を使うと色々便利だそうです。
+    # NOTE: 画像の入力は、 keras.utils の load_img などを使うと色々便利だそうです。
     # NOTE: <class 'PIL.Image.Image'>
-    image_pil = image.load_img(input_filename, target_size=(224, 224))
+    image_pil = load_img(input_filename, target_size=(224, 224))
 
     # 読み込んだ画像は PIL 形式です。それを array に変換します。
     # NOTE: <class 'numpy.ndarray'>
-    image_array_3dim = image.img_to_array(image_pil)
+    image_array_3dim = img_to_array(image_pil)
 
     # 3次元テンソル(rows, cols, channels)を4次元テンソル(samples, rows, cols, channels)に変換する、
     # という行為を行っています。
-    # 入力画像が1枚なので、 smaples=1 でいいそうです。
+    # 入力画像が1枚なので、 samples=1 でいいそうです。
     # NOTE: 意味不明。だけど、 row, col, channel は OpenCV で見た覚えがあります。
     #       まあ画像の形式を変換しているんでしょう。(小泉文法)
     # NOTE: <class 'numpy.ndarray'>
@@ -75,9 +76,8 @@ def main(input_filename: str):
 
 
 if __name__ == '__main__':
-
     if len(sys.argv) != 2:
-        print('Usage: python test_vgg16.py [image file]')
+        print('Usage: python predict_imagenet.py [image file]')
         sys.exit(1)
 
     filename = sys.argv[1]

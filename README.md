@@ -1,50 +1,136 @@
 keras-vgg16-lab
 ===
 
-⚗️ The repository for experiment of Keras, Vgg16 and Fine tuning. The purposes are to practice Fine tuning with "17 flowers" with my own hands and to get to be able to explain Keras, Vgg16 and Fine tuning with my own mouse.
+Keras の VGG16 と 17 Category Flower Dataset (17flowers) で、転移学習を試す実験 Repository だよ。
+VGG16 の畳み込み層を固定し、追加した層を学習する。
 
-## Installation
+- Python: 3.13 (`.python-version`)
+- ランタイム: TensorFlow 2.21 / Keras 3、CPU で動作確認
+- 依存管理: uv (`uv.lock` で固定)
+- Lint: ruff (`ruff check` / `ruff format --check`)
+- テスト: pytest。ネットワークなしで、合成した小さい画像とランダム重みの TensorFlow スモークテストまで実行する
+- CI: GitHub Actions (`.github/workflows/ci.yml`) で lint とテスト
+- Docker: 非対応 (理由は「Docker について」)
 
-I don't know why but Keras and Tensorflow occur pipenv "Locking failed!" error.  
-So I gave up pipenv to create correct Pipfile.lock.
+## パッと実行してみたい
 
-```bash
-pipenv install --skip-lock
-pipenv run pip install -r requirements.txt
-```
-
-### Installation in Japanese
-
-まず何らかの方法で pipenv を手に入れてください。
-
-- [https://pipenv-ja.readthedocs.io/ja/translate-ja/install.html#installing-pipenv](https://pipenv-ja.readthedocs.io/ja/translate-ja/install.html#installing-pipenv)
-
-「手に入れられたのか」わからない? こちら↓のコマンドを Terminal で打って、バージョンが出れば成功です。
+[uv](https://docs.astral.sh/uv/) を入れてから、Repository のルートで次を実行してね。
+Python 3.13 が手元になければ uv が取得する。
 
 ```bash
-pipenv --version
-# -> pipenv, version 2020.11.15 みたいに出れば OK.
+uv sync --locked
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
 ```
 
-pipenv を手に入れてから、こう↓です。
+テストは学習済みの重みもデータセットもダウンロードしない。
+
+## 使い方
+
+### ImageNet 学習済み VGG16 でそのまま推論する
 
 ```bash
-pipenv install --skip-lock
-pipenv run pip install -r requirements.txt
-
-# かんたんに prediction を試す。
-pipenv run python test_vgg16.py test-images/shepherd.jpg
-
-# すでに @yuu-eguci から hdf5 を受け取っている場合に、すぐに花の prediction を試す場合。
-pipenv run python load_17flowers.py sunflower.jpg
-
-# 自分で fine tuning を試したい場合。
-cd 17flowers/
-# これで 17flowers に入ってから、 setup_17flowers_for_fine_tuning.py の指示に従う。
-# あ、やべ間に合わない。あとは会議にて。
+uv run python predict_imagenet.py test-images/shepherd.jpg
 ```
 
-## To explain Keras, Vgg16 and Fine tuning with my own mouse
+初回だけ、ImageNet 学習済みの重み (全結合層つき、553,467,096 バイト ≒ 553 MB) とクラス名ファイル (35 KB) を `~/.keras/models/` にダウンロードする。
+保存先は環境変数 `KERAS_HOME` で変えられる。
+
+### 17flowers で学習して推論する
+
+学習済みの花モデルは配布していない。2021 年に作った `17flowers.hdf5` は公開されておらず、いまのコードでも読み込まない (「メタデータと前処理」)。使うには自分で学習してね。
+
+1. データセット (60,270,631 バイト ≒ 60 MB) をダウンロードして解凍する。`jpg/` フォルダが出てくる。
+    - [https://www.robots.ox.ac.uk/~vgg/data/flowers/17/](https://www.robots.ox.ac.uk/~vgg/data/flowers/17/) の Dataset images (`17flowers.tgz`)
+2. `jpg/` を `17flowers/jpg/` に置く。
+3. train / test に分ける。
+
+    ```bash
+    cd 17flowers
+    uv run python setup_17flowers_for_fine_tuning.py
+    cd ..
+    ```
+
+    - クラスごとに `--test-per-class` 枚 (既定 10 枚) を `test_images/` へ、残りを `train_images/` へコピーする。元の `jpg/` は変更しない。
+    - 分け方は `--seed` (既定 0) で決まる。同じファイルと同じ設定なら、何回やっても同じ結果になる。
+    - `image_0001.jpg` から `image_1360.jpg` の形の名前のファイルだけを使う。`files.txt` や `.DS_Store` など、それ以外のファイルやフォルダは無視する。
+    - もう分けてある状態で同じ設定でもう一度実行しても、何も変わらない。中身が違う、または設定が違うときはエラーで止まる。やり直したいときは `train_images/` と `test_images/` を自分で消してから実行してね。
+    - 出力先が `jpg/` と同じ、`jpg/` の中、などの危ないパス指定はエラーになる。
+    - `--source` (既定 `jpg`) と `--output` (既定 `.`) で場所を変えられる。
+
+4. 学習する。
+
+    ```bash
+    uv run python fine_tuning_17flowers.py --epochs 3
+    ```
+
+    - VGG16 の畳み込み層 (ImageNet 学習済み) は固定して、その上に追加した層 (GlobalAveragePooling2D、Dense 1024、Dense 17) だけを学習する。
+    - 初回だけ全結合層なしの重み (58,889,256 バイト ≒ 59 MB) をダウンロードする。
+    - `17flowers.keras` と `17flowers.metadata.json` ができる。`--output` で場所を変えられる。
+    - `17flowers/test_images/` は学習中の検証 (validation) に使う。
+    - 既定は `--epochs 10`。CPU だと 1 epoch に数十秒から数分かかる。そのほかの引数は `--help` で見られる。
+
+5. 推論する。
+
+    ```bash
+    uv run python load_17flowers.py test-images/sunflower.jpg
+    ```
+
+    確率の高い順に 5 クラス (`--top` で変更) を表示する。モデルは `--model` (既定 `17flowers.keras`) で指定する。
+
+### メタデータと前処理
+
+学習すると、モデル (`.keras`) と同じ場所に `<名前>.metadata.json` を保存する。
+
+- `class_names`: モデルの出力の順番どおりのクラス名。学習データのフォルダ名を Keras が文字コード順に並べた順番 (17flowers ではアルファベット順)。
+- `image_size`: 入力画像のサイズ。
+- `color_mode` と `interpolation`: 画像は RGB で読み、bilinear でリサイズする。
+- `preprocessing`: 前処理。`keras.applications.vgg16.preprocess_input` (RGB を BGR にして ImageNet の平均を引く)。
+- `base_weights` と `keras_version`: 記録用。
+
+`load_17flowers.py` はこのファイルを読んで、学習時と同じ前処理とクラス名の順番で推論する。メタデータがない、形式が違う、前処理がいまのコードと違う、モデルの出力数や入力サイズと合わない、のどれかに当たると、推測で読み替えずにエラーで止まる。`.h5` / `.hdf5` のモデルも読み込まない。2021 年版のモデルは前処理 (1/255) もクラスの順番もいまと違うためだよ。再学習が必要になる。
+
+モデルは Keras の `load_model` の safe mode (既定) で読み込む。それでも、出どころのわからない `.keras` ファイルは読み込まないでね。
+
+### 実データでの確認
+
+2026-10-27 に Apple M1 Pro (CPU のみ、メモリ 32 GB) で、上の手順を 1 回だけ実行した記録だよ。
+
+- ダウンロード: データセット 60,270,631 バイトと全結合層なしの重み 58,889,256 バイトで、合わせて約 119 MB。全結合層つきの重み (553 MB) は使っていない。
+- split: 既定の設定 (seed 0、test 10 枚) で train 1,190 枚、test 170 枚。train と test の重なりは 0 枚。`files.txt` と `files.txt~` は無視。同じ設定の再実行は何もせず、`--seed 1` での再実行はエラーで止まった。
+- 学習: `--epochs 3` で 252.5 秒 (1 epoch 81 秒)、最大メモリ 1.6 GB。検証 (test_images の 170 枚) の正解率は 1〜3 epoch で 0.853、0.894、0.918。
+- 推論: `test-images/sunflower.jpg` は Sunflower (1.0000)。1 枚 2〜3 秒 (TensorFlow の起動を含む)。
+
+seed を変えた再実験も、別のテストデータでの評価もしていない。正解率は参考値として見てね。17 種類の花のどれかを必ず答えるモデルなので、花でない画像にも自信満々で答える。たとえば `test-images/shepherd.jpg` (犬) は Iris (1.0000) だった。
+
+## 制限
+
+- 学習済みの花モデルは配布していない。データセットのページに利用条件が書かれていないので、画像も再配布しない。
+- test は 1 クラス 10 枚と少なく、検証にも使っている。データセット公式の分け方 (data splits) は使っていない。正解率は参考値として見てね。
+- `test-images/` のサンプル画像の出典は記録がない。
+- GPU では確認していない。
+
+## Docker について
+
+非対応。CPU で動く小さな実験スクリプトなので、`uv.lock` だけで依存を再現できる。TensorFlow 2.21 には macOS (arm64)、Linux (x86_64 / aarch64)、Windows 用の wheel があり、uv でインストールできる (Windows では未確認)。
+
+Docker イメージにすると TensorFlow だけで 1 GB 以上になり、データセットと重みのキャッシュをボリュームでつなぐ手間も増える。macOS の Docker からは GPU も使えないので、速くもならない。サーバーとして公開するものでもないので、Docker を用意していない。
+
+## ファイル
+
+- `predict_imagenet.py`: ImageNet 学習済み VGG16 で 1 枚推論する
+- `17flowers/setup_17flowers_for_fine_tuning.py`: 17flowers を train / test に分ける
+- `fine_tuning_17flowers.py`: 17flowers で学習する
+- `load_17flowers.py`: 学習したモデルで 1 枚推論する
+- `vgg16lab/`: 上のスクリプトが使う処理
+- `tests/`: pytest
+- `docs/`: 2021 年の打ち合わせ資料と Q and A
+- `setup_flower_stuff_lab.ipynb`: Colaboratory で GPU の確認と Google Drive のマウントだけをする、作りかけのノートブック
+
+## To explain Keras, Vgg16 and Fine tuning with my own mouth
+
+2021 年に書いた学習メモ。
 
 ### Keras
 
