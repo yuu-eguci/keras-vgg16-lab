@@ -14,86 +14,37 @@ https://www.robots.ox.ac.uk/~vgg/data/flowers/17/
 2. 17flowers.tgz を解凍すると jpg というフォルダが出現します。
 3. jpg フォルダをこのスクリプトの隣に置いてください。
 4. cd 17flowers/
-5. python setup_17flowers_for_fine_tuning.py
+5. uv run python setup_17flowers_for_fine_tuning.py
+
+クラスごとに、ランダムに選んだ --test-per-class 枚 (既定 10 枚) を test_images へ、残りを train_images へコピーします。
+選び方は --seed で決まるので、同じ設定なら何回やっても同じ分け方です。
 """
 
-import os
-import shutil
-import random
+import argparse
+import sys
+from pathlib import Path
 
-# 17flowers.tgz を解凍して出てくるフォルダです。
-IN_DIR = 'jpg'
-# 80枚の中から70枚を、学習用画像として TRAIN_DIR に格納します。
-TRAIN_DIR = 'train_images'
-# 80枚の中から10枚を、予測テスト用画像として TEST_DIR に格納します。
-TEST_DIR = 'test_images'
+from vgg16lab.flowers_split import SplitError, split_17flowers
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description='17flowers の jpg/ を train_images/ と test_images/ に分けます。')
+    parser.add_argument('--source', type=Path, default=Path('jpg'), help='17flowers.tgz を解凍した jpg フォルダ')
+    parser.add_argument('--output', type=Path, default=Path('.'), help='train_images/ と test_images/ を作る場所')
+    parser.add_argument('--test-per-class', type=int, default=10, help='クラスごとに test へまわす枚数')
+    parser.add_argument('--seed', type=int, default=0, help='分け方を決める乱数の seed')
+    args = parser.parse_args(argv)
 
-    # 格納用フォルダ、なければ作っておきます。
-    if not os.path.exists(TRAIN_DIR):
-        os.mkdir(TRAIN_DIR)
-    if not os.path.exists(TEST_DIR):
-        os.mkdir(TEST_DIR)
+    try:
+        result = split_17flowers(args.source, args.output, args.test_per_class, args.seed)
+    except SplitError as error:
+        print(f'エラー: {error}', file=sys.stderr)
+        return 1
 
-    # 17flowers に含まれる画像のメタ情報です。
-    # { 花の名前: (その画像の番号) }
-    flower_dics = {
-        'Tulip': (1, 80),
-        'Snowdrop': (81, 160),
-        'LilyValley': (161, 240),
-        'Bluebell': (241, 320),
-        'Crocus': (321, 400),
-        'Iris': (401, 480),
-        'Tigerlily': (481, 560),
-        'Daffodil': (561, 640),
-        'Fritillary': (641, 720),
-        'Sunflower': (721, 800),
-        'Daisy': (801, 880),
-        'ColtsFoot': (881, 960),
-        'Dandelion': (961, 1040),
-        'Cowslip': (1041, 1120),
-        'Buttercup': (1121, 1200),
-        'Windflower': (1201, 1280),
-        'Pansy': (1281, 1360),
-    }
-
-    # 花ごとのフォルダを作成します。
-    for name in flower_dics:
-        if not os.path.exists(os.path.join(TRAIN_DIR, name)):
-            os.mkdir(os.path.join(TRAIN_DIR, name))
-        if not os.path.exists(os.path.join(TEST_DIR, name)):
-            os.mkdir(os.path.join(TEST_DIR, name))
-
-    for f in sorted(os.listdir(IN_DIR)):
-        # jpg だけが対象です。それ以外は continue します。
-        if os.path.splitext(f)[1] != '.jpg':
-            continue
-        # image_0001.jpg => 1
-        prefix = f.replace('.jpg', '')
-        idx = int(prefix.split('_')[1])
-
-        for name in flower_dics:
-            start, end = flower_dics[name]
-            if idx in range(start, end + 1):
-                source = os.path.join(IN_DIR, f)
-                dest = os.path.join(TRAIN_DIR, name)
-                shutil.copy(source, dest)
-                continue
-
-    # 訓練データの各ディレクトリからランダムに10枚をテストとする
-    for d in os.listdir(TRAIN_DIR):
-        # jpg だけが対象です。それ以外は continue します。
-        if os.path.splitext(f)[1] != '.jpg':
-            continue
-        files = os.listdir(os.path.join(TRAIN_DIR, d))
-        random.shuffle(files)
-        for f in files[:10]:
-            source = os.path.join(TRAIN_DIR, d, f)
-            dest = os.path.join(TEST_DIR, d)
-            shutil.move(source, dest)
+    status = '分けました' if result.created else 'すでに同じ設定で分けてあるので、何もしませんでした'
+    print(f'{status}。train: {result.train_count} 枚、test: {result.test_count} 枚、無視: {result.ignored_count} 件')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

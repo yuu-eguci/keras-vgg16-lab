@@ -2,7 +2,9 @@
 
 import keras
 import numpy
-from PIL import Image
+from conftest import make_image_tree
+
+from vgg16lab import classifier
 
 # データセットの画像番号の順番です。Keras はこの順番ではなく、フォルダ名の順番で番号を振ります。
 DATASET_ORDER = [
@@ -11,16 +13,23 @@ DATASET_ORDER = [
 ]  # fmt: skip
 
 
-def make_class_dirs(root, size=8):
-    for i, name in enumerate(DATASET_ORDER):
-        (root / name).mkdir()
-        Image.fromarray(numpy.full((size, size, 3), i * 10, dtype=numpy.uint8)).save(root / name / 'a.jpg')
-
-
 def test_inference_labels_follow_training_class_order(tmp_path):
-    make_class_dirs(tmp_path)
-    training_order = keras.utils.image_dataset_from_directory(tmp_path, image_size=(8, 8), batch_size=4).class_names
+    data = make_image_tree(tmp_path / 'data', DATASET_ORDER, per_class=1)
+    training_order = keras.utils.image_dataset_from_directory(data, image_size=(32, 32), batch_size=4).class_names
+    model_path = tmp_path / 'flowers.keras'
+    classifier.train(data, data, model_path, epochs=1, batch_size=8, image_size=32, weights=None, verbose=0)
 
-    import load_17flowers
+    model, metadata = classifier.load_classifier(model_path)
 
-    assert load_17flowers.CLASSES_FOR_17FLOWERS == training_order
+    assert metadata.class_names == training_order
+
+    # 出力の Sunflower の番号だけが大きくなるようにして、表示が Sunflower になるかを確かめます。
+    # 2021 年版の並びだと、この番号は Cowslip と表示されていました。
+    sunflower = training_order.index('Sunflower')
+    assert DATASET_ORDER[sunflower] == 'Cowslip'
+    kernel, bias = model.layers[-1].get_weights()
+    bias = numpy.full_like(bias, -10.0)
+    bias[sunflower] = 10.0
+    model.layers[-1].set_weights([numpy.zeros_like(kernel), bias])
+
+    assert classifier.predict(model, metadata, data / 'Tulip' / '0.jpg', top=1)[0][0] == 'Sunflower'

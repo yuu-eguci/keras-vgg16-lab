@@ -141,3 +141,8 @@ cython_debug/
 my-images/*
 .DS_Store
 *.hdf5
+
+# 学習で作るモデルとメタデータ、split の作業用フォルダ
+*.keras
+*.metadata.json
+.split-*/

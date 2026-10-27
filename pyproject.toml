@@ -28,6 +28,8 @@ module-root = ""
 [tool.ruff]
 line-length = 120
 target-version = "py313"
+# 2021 年の Colaboratory 用ノートブックはそのまま残します。
+extend-exclude = ["setup_flower_stuff_lab.ipynb"]
 
 [tool.ruff.format]
 quote-style = "single"
